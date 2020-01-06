@@ -6,6 +6,10 @@ import os
 import numpy as np
 import tensorflow as tf
 
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
+from datetime import date
+
 import model, sample, encoder
 
 def interact_model(
@@ -76,6 +80,7 @@ def interact_model(
                 raw_text = input("Model prompt >>> ")
             context_tokens = enc.encode(raw_text)
             generated = 0
+            msg = ""
             for _ in range(nsamples // batch_size):
                 out = sess.run(output, feed_dict={
                     context: [context_tokens for _ in range(batch_size)]
@@ -85,8 +90,25 @@ def interact_model(
                     text = enc.decode(out[i])
                     print("=" * 40 + " SAMPLE " + str(generated) + " " + "=" * 40)
                     print(text)
-            print("=" * 80)
+                    msg += "\n\n" + '='*80 + "\n\n" + text
+            msg = raw_text + msg
+
+            message = Mail(
+                from_email=os.environ.get('EMAIL_FROM'),
+                to_emails=os.environ.get('EMAIL_TO'),
+                subject=f'GPT-2 1558M {date.today().isoformat()}',
+                plain_text_content=msg
+            )
+            try:
+                sg = SendGridAPIClient(os.environ.get('SENDGRID_API_KEY'))
+                response = sg.send(message)
+                print(response.status_code)
+                print(response.body)
+                print(response.headers)
+            except Exception as e:
+                print(e)
 
 if __name__ == '__main__':
     fire.Fire(interact_model)
 
+    
